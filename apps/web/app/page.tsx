@@ -24,12 +24,13 @@ export const revalidate = 30;
 export default async function Home() {
   const sections = await getDashboardSections();
   const savedPanels = await getSavedPanels();
-  const dict = getDictionary(await getLocale());
+  const locale = await getLocale();
+  const dict = getDictionary(locale);
 
   return (
     <div className="today-page">
       <Suspense fallback={<HeroSkeleton />}>
-        <HeroSection />
+        <HeroSection copy={dict.today} locale={locale} />
       </Suspense>
 
       {sections.goal && (
@@ -40,13 +41,13 @@ export default async function Home() {
 
       {sections.story && (
         <Suspense fallback={<RowSkeleton />}>
-          <TodayStorySection />
+          <TodayStorySection copy={dict.today} />
         </Suspense>
       )}
 
       {sections.signals && (
         <Suspense fallback={<GridSkeleton />}>
-          <SignalsSection />
+          <SignalsSection copy={dict.today} />
         </Suspense>
       )}
 
@@ -70,7 +71,7 @@ export default async function Home() {
         <div className="row-2 today-proof-row">
           {sections.vault && (
             <Suspense fallback={<CardSkeleton />}>
-              <VaultSection />
+              <VaultSection copy={dict.today} locale={locale} />
             </Suspense>
           )}
           {sections.readiness && (

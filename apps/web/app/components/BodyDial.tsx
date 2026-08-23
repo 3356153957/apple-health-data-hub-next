@@ -21,6 +21,7 @@ export function BodyDial({
   tone,
   caption = "Recovery",
   baselineBand,
+  ariaLabel,
 }: {
   score: number | null;
   tone: DialTone;
@@ -28,6 +29,7 @@ export function BodyDial({
   // Optional "recent normal" range in score units (0-100). Omitted honestly
   // when the hero has no baseline range for the score itself.
   baselineBand?: [number, number];
+  ariaLabel?: string;
 }) {
   const band = bandArc(baselineBand, R_ARC);
 
@@ -37,7 +39,7 @@ export function BodyDial({
         <svg
           viewBox="0 0 260 232"
           role="img"
-          aria-label={score !== null ? `Recovery ${Math.round(score)} of 100` : "Recovery score building"}
+          aria-label={ariaLabel ?? (score !== null ? `Recovery ${Math.round(score)} of 100` : "Recovery score building")}
         >
           {TICKS.map((tk) => (
             <line
