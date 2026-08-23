@@ -1,6 +1,5 @@
 import { type Finding, isNarratorOff, type MetricSeries, type Privacy, type Readiness } from "../../lib/api";
 import {
-  agoLabel,
   dataState,
   GRID_METRICS,
   hasAnyData,
@@ -18,7 +17,17 @@ import {
   safeSeriesMany,
 } from "../../lib/load";
 import { recoveryEvidence } from "../../lib/findingPresentation";
+import type { Locale } from "../../lib/i18n";
 import { getFocusGoal, getPinnedMetrics } from "../../lib/prefs";
+import {
+  buildHeroByline,
+  buildTodayHighlights,
+  buildTodaySummary,
+  formatRecoveryCompleteness,
+  formatTodayAgo,
+  formatTodayCopy,
+  type TodayCopy,
+} from "../../lib/todayCopy";
 import { EvidenceCard } from "../EvidenceCard";
 import { ExperimentsCard } from "../ExperimentsCard";
 import { FocusGoalPicker } from "../FocusGoalPicker";
@@ -27,7 +36,7 @@ import { LocalVaultReceipt, type VaultStep } from "../LocalVaultReceipt";
 import { MetricCard } from "../MetricCard";
 import { MobilityCard } from "../MobilityCard";
 import { ReadinessCard } from "../ReadinessCard";
-import { type BylineItem, RecoveryHero, type TodayHighlight } from "../RecoveryHero";
+import { RecoveryHero } from "../RecoveryHero";
 import { SleepCard } from "../SleepCard";
 import { TodayPlumbing } from "../TodayPlumbing";
 import { WeeklyBriefCard } from "../WeeklyBriefCard";
@@ -40,19 +49,19 @@ function recoveryScore(findings: Finding[] | null): number | null {
   return recoveryEvidence(recoveryFinding(findings))?.score ?? null;
 }
 
-function recoveryCompleteness(findings: Finding[] | null): string | null {
+function recoveryCompleteness(findings: Finding[] | null, copy: TodayCopy, locale: Locale): string | null {
   const evidence = recoveryEvidence(recoveryFinding(findings));
-  return evidence ? `${evidence.inputCount}/${evidence.inputTotal} inputs` : null;
+  return evidence ? formatRecoveryCompleteness(copy, evidence.inputCount, evidence.inputTotal, locale) : null;
 }
 
 const CONTRIBUTOR_DEFS = [
-  { key: "hrv_vs_baseline_pct", label: "HRV", unit: "%", positiveIsGood: true },
-  { key: "rhr_vs_baseline_pct", label: "Resting HR", unit: "%", positiveIsGood: false },
-  { key: "respiratory_rate_vs_baseline_pct", label: "Resp. rate", unit: "%", positiveIsGood: false },
-  { key: "temperature_deviation_c", label: "Wrist temp", unit: "°C", positiveIsGood: false },
-];
+  { key: "hrv_vs_baseline_pct", labelKey: "hrv", unit: "%", positiveIsGood: true },
+  { key: "rhr_vs_baseline_pct", labelKey: "restingHeartRate", unit: "%", positiveIsGood: false },
+  { key: "respiratory_rate_vs_baseline_pct", labelKey: "respiratoryRate", unit: "%", positiveIsGood: false },
+  { key: "temperature_deviation_c", labelKey: "wristTemperature", unit: "°C", positiveIsGood: false },
+] as const;
 
-function recoveryContributors(findings: Finding[] | null) {
+function recoveryContributors(findings: Finding[] | null, copy: TodayCopy) {
   const found = recoveryFinding(findings);
   if (!recoveryEvidence(found)) return [];
   const raw = found?.structured_data?.contributors as Record<string, unknown> | undefined;
@@ -60,7 +69,7 @@ function recoveryContributors(findings: Finding[] | null) {
   return CONTRIBUTOR_DEFS.flatMap((def) => {
     const value = raw[def.key];
     return typeof value === "number" && Number.isFinite(value)
-      ? [{ label: def.label, value, unit: def.unit, positiveIsGood: def.positiveIsGood }]
+      ? [{ label: copy.contributors[def.labelKey], value, unit: def.unit, positiveIsGood: def.positiveIsGood }]
       : [];
   });
 }
@@ -92,65 +101,17 @@ function changeCount(findings: Finding[] | null): number {
   return findings?.filter((finding) => finding.finding_type !== "recovery_score").length ?? 0;
 }
 
-function todaySummary(score: number | null, findings: Finding[] | null, readiness: Readiness | null): string {
-  const ready = readyMetricCount(readiness);
-  const changes = changeCount(findings);
-  const readyLine = ready > 0 ? `${ready} signals have enough history.` : "Your baseline is still building.";
-
-  if (score === null) {
-    return `Your data is syncing. ${readyLine}`;
-  }
-  if (score >= 60) {
-    return changes > 0
-      ? `You look steady. The brief below shows what changed. ${readyLine}`
-      : `You look steady. No major changes need attention. ${readyLine}`;
-  }
-  if (score >= 45) {
-    return `Some signals are worth watching today. Start with the first change below. ${readyLine}`;
-  }
-  return `Recovery is low today. Focus on rest, sleep, and heart-rate signals first. ${readyLine}`;
-}
-
-function todayHighlights(readiness: Readiness | null, findings: Finding[] | null, live: boolean): TodayHighlight[] {
-  return [
-    {
-      label: "Last sync",
-      value: agoLabel(readiness?.last_observation_at),
-      hint: live ? "recent readings" : "refresh soon",
-      tone: live ? "good" : "watch",
-    },
-    {
-      label: "Signals",
-      value: metricsWithData(readiness).toLocaleString(),
-      hint: "with data",
-    },
-    {
-      label: "Ready",
-      value: readyMetricCount(readiness).toLocaleString(),
-      hint: "enough history",
-    },
-    {
-      label: "Changes",
-      value: changeCount(findings).toLocaleString(),
-      hint: changeCount(findings) > 0 ? "review below" : "none flagged",
-    },
-  ];
-}
-
 // Byline for the hero lede — every atom is a fact the hero already holds
 // (that the score is measured against the personal baseline, the ready-signal
 // count, sync freshness). We deliberately do NOT print a "nights" count: the
 // only window figure on hand is the raw HRV sample count (thousands of
 // readings, not nights), so quoting it would be a misleading number.
-function heroByline(readiness: Readiness | null, freshness: string): BylineItem[] {
-  const items: BylineItem[] = [{ lead: "from ", strong: "your baseline" }];
-  const ready = readyMetricCount(readiness);
-  if (ready > 0) items.push({ strong: ready.toLocaleString(), trail: " signals ready" });
-  items.push({ lead: "synced ", strong: freshness });
-  return items;
-}
-
-function vaultSteps(privacy: Privacy | null, readiness: Readiness | null): VaultStep[] {
+function vaultSteps(
+  privacy: Privacy | null,
+  readiness: Readiness | null,
+  copy: TodayCopy,
+  locale: Locale,
+): VaultStep[] {
   const sourceCount = readiness?.sources?.length ?? 0;
   const totalRows = (readiness?.sources ?? []).reduce((n, s) => n + (s.observation_count ?? 0), 0);
   const provider = privacy?.provider ?? "ollama";
@@ -158,32 +119,49 @@ function vaultSteps(privacy: Privacy | null, readiness: Readiness | null): Vault
   const cloudActive = privacy?.cloud_active ?? false;
   const narratorOff = isNarratorOff(privacy?.provider);
   return [
-    { label: "HealthSave sync", meta: sourceCount > 1 ? `${sourceCount} sources` : agoLabel(readiness?.last_ingested_at) },
-    { label: "Local store", meta: totalRows ? `${totalRows.toLocaleString()} rows` : "ready" },
-    { label: "Pattern checks", meta: "on this server" },
+    {
+      label: copy.vault.healthSaveSync,
+      meta:
+        sourceCount > 1
+          ? formatTodayCopy(copy.vault.sources, { count: sourceCount.toLocaleString(locale) })
+          : formatTodayAgo(readiness?.last_ingested_at, locale),
+    },
+    {
+      label: copy.vault.localStore,
+      meta: totalRows
+        ? formatTodayCopy(copy.vault.rows, { count: totalRows.toLocaleString(locale) })
+        : copy.vault.ready,
+    },
+    { label: copy.vault.patternChecks, meta: copy.vault.onThisServer },
     narratorOff
-      ? { label: "Briefs", meta: "off" }
-      : { label: local ? "Private briefs" : "Cloud briefs", meta: local ? "local" : provider },
-    { label: "Cloud sharing", meta: cloudActive ? "on" : "off", blocked: !cloudActive },
+      ? { label: copy.vault.briefs, meta: copy.vault.off }
+      : {
+          label: local ? copy.vault.privateBriefs : copy.vault.cloudBriefs,
+          meta: local ? copy.vault.local : provider,
+        },
+    {
+      label: copy.vault.cloudSharing,
+      meta: cloudActive ? copy.vault.on : copy.vault.off,
+      blocked: !cloudActive,
+    },
   ];
 }
 
-async function EmptyToday({ state }: { state: "empty" | "unreachable" }) {
+async function EmptyToday({ copy, state }: { copy: TodayCopy; state: "empty" | "unreachable" }) {
   if (state === "unreachable") {
     return (
       <section className="lead">
         <article className="hero today-hero">
-          <div className="hero-eyebrow">Today</div>
-          <h2>Today could not load</h2>
+          <div className="hero-eyebrow">{copy.empty.unreachableEyebrow}</div>
+          <h2>{copy.empty.unreachableTitle}</h2>
           <p className="recovery-line" style={{ marginTop: 8 }}>
-            Today loaded, but your Observatory data did not answer. Check the sync service or use the demo while
-            it reconnects.
+            {copy.empty.unreachableBody}
           </p>
           <div className="exp-action">
             <a className="btn" href="/demo">
-              Explore demo
+              {copy.empty.exploreDemo}
             </a>
-          <span className="empty">The demo uses local sample data while your connection recovers.</span>
+            <span className="empty">{copy.empty.unreachableDemoHint}</span>
           </div>
         </article>
       </section>
@@ -194,49 +172,55 @@ async function EmptyToday({ state }: { state: "empty" | "unreachable" }) {
   return (
     <section className="lead">
       <article className="hero today-hero firstrun">
-        <div className="hero-eyebrow">Welcome</div>
-        <h2>Your private observatory is ready</h2>
+        <div className="hero-eyebrow">{copy.empty.welcomeEyebrow}</div>
+        <h2>{copy.empty.welcomeTitle}</h2>
         <p className="recovery-line" style={{ marginTop: 8 }}>
-          Sync Apple Health from the app, then explore your data across three surfaces.
+          {copy.empty.welcomeBody}
         </p>
         <ol className="firstrun-steps">
           <li className="firstrun-step">
             <span className="firstrun-n">1</span>
             <div>
-              <strong>Pair HealthSave app.</strong>
+              <strong>{copy.empty.pairTitle}</strong>
               <span className="firstrun-hint">
-                Open <strong>HealthSave → Settings → Server Sync</strong> on your phone and enter this server&apos;s URL.
+                {copy.empty.pairBefore}
+                <strong>{copy.empty.pairPath}</strong>
+                {copy.empty.pairAfter}
               </span>
             </div>
           </li>
           <li className="firstrun-step">
             <span className="firstrun-n">2</span>
             <div>
-              <strong>Explore the three pillars.</strong>
+              <strong>{copy.empty.pillarsTitle}</strong>
               <span className="firstrun-hint">
-                <a href="/">Today</a> tracks recovery.{" "}
-                <a href="/sleep">Sleep</a> shows your nights.{" "}
-                <a href="/activity">Activity</a> measures daily strain.
+                <a href="/">{copy.empty.todayLink}</a>
+                {copy.empty.todayHint}
+                <a href="/sleep">{copy.empty.sleepLink}</a>
+                {copy.empty.sleepHint}
+                <a href="/activity">{copy.empty.activityLink}</a>
+                {copy.empty.activityHint}
               </span>
             </div>
           </li>
           <li className="firstrun-step">
             <span className="firstrun-n">3</span>
             <div>
-              <strong>Try the demo.</strong>
+              <strong>{copy.empty.demoTitle}</strong>
               <span className="firstrun-hint">
-                <a href="/demo">Explore demo</a> — a 30-day recovery story with real-looking data.
+                <a href="/demo">{copy.empty.exploreDemo}</a>
+                {copy.empty.demoHint}
               </span>
             </div>
           </li>
           <li className="firstrun-step">
             <span className="firstrun-n">4</span>
             <div>
-              <strong>Set your focus.</strong>
+              <strong>{copy.empty.focusTitle}</strong>
               <span className="firstrun-hint">
                 {goal
-                  ? `Working toward: ${goal.title}. Tap again to change or clear it.`
-                  : "Pick what you are working toward. Today will orient around it."}
+                  ? formatTodayCopy(copy.empty.activeGoal, { goal: goal.title })
+                  : copy.empty.emptyGoal}
               </span>
               <FocusGoalPicker active={goal} />
             </div>
@@ -281,9 +265,9 @@ export async function GoalSection() {
   return <GoalRibbon goal={goal} seriesById={seriesById} />;
 }
 
-export async function HeroSection() {
+export async function HeroSection({ copy, locale }: { copy: TodayCopy; locale: Locale }) {
   const state = await dataState();
-  if (state !== "data") return <EmptyToday state={state} />;
+  if (state !== "data") return <EmptyToday copy={copy} state={state} />;
 
   const [readiness, findings, hrv] = await Promise.all([
     safeReadiness(),
@@ -294,49 +278,69 @@ export async function HeroSection() {
   const lastObs = readiness?.last_observation_at;
   const live = Boolean(lastObs && Date.now() - new Date(lastObs).getTime() < 24 * 3600_000);
   const score = recoveryScore(findings);
-  const freshness = agoLabel(readiness?.last_observation_at);
+  const freshness = formatTodayAgo(readiness?.last_observation_at, locale);
+  const ready = readyMetricCount(readiness);
+  const changes = changeCount(findings);
 
   return (
     <>
       <RecoveryHero
+        copy={copy.hero}
         freshness={freshness}
         live={live}
         score={score}
-        contributors={recoveryContributors(findings)}
-        summary={todaySummary(score, findings, readiness)}
-        byline={heroByline(readiness, freshness)}
+        contributors={recoveryContributors(findings, copy)}
+        summary={buildTodaySummary(copy, { score, changes, ready, locale })}
+        byline={buildHeroByline(copy, { ready, freshness, locale })}
         deltaPct={recoveryDelta(findings)}
-        evidenceLabel={recoveryCompleteness(findings)}
-        ribbon={ribbonValues.length >= 2 ? { values: ribbonValues, axis: ["30 days ago", "today"] } : null}
+        evidenceLabel={recoveryCompleteness(findings, copy, locale)}
+        ribbon={
+          ribbonValues.length >= 2
+            ? { values: ribbonValues, axis: [copy.hero.axisStart, copy.hero.axisEnd] }
+            : null
+        }
       />
-      <TodayPlumbing highlights={todayHighlights(readiness, findings, live)} live={live} />
+      <TodayPlumbing
+        copy={copy.plumbing}
+        highlights={buildTodayHighlights(copy, {
+          freshness,
+          metricsWithData: metricsWithData(readiness),
+          ready,
+          changes,
+          live,
+          locale,
+        })}
+        live={live}
+      />
     </>
   );
 }
 
-export async function VaultSection() {
+export async function VaultSection({ copy, locale }: { copy: TodayCopy; locale: Locale }) {
   if (!(await hasAnyData())) return null;
   const [privacy, readiness, receipts] = await Promise.all([safePrivacy(), safeReadiness(), safeReceipts()]);
   const cloudActive = privacy?.cloud_active ?? false;
   const lastEvent = receipts?.events?.[0];
   const auditNote = lastEvent
-    ? `Privacy setting changed - ${agoLabel(lastEvent.created_at)}`
+    ? formatTodayCopy(copy.vault.privacyChanged, {
+        freshness: formatTodayAgo(lastEvent.created_at, locale),
+      })
     : receipts?.events_unavailable
-      ? "Privacy history is still being prepared"
+      ? copy.vault.historyPreparing
       : null;
 
   return (
     <LocalVaultReceipt
-      steps={vaultSteps(privacy, readiness)}
-      title={cloudActive ? "Data sharing" : "Data privacy"}
-      seal={cloudActive ? "Cloud briefs on" : "Stays local"}
+      steps={vaultSteps(privacy, readiness, copy, locale)}
+      title={cloudActive ? copy.vault.dataSharing : copy.vault.dataPrivacy}
+      seal={cloudActive ? copy.vault.cloudBriefsOn : copy.vault.staysLocal}
       variant={cloudActive ? "egress" : "local"}
       auditNote={auditNote}
     />
   );
 }
 
-export async function TodayStorySection() {
+export async function TodayStorySection({ copy }: { copy: TodayCopy }) {
   if (!(await hasAnyData())) return null;
   const [latest, findings, privacy, narratives, candidates, experiments] = await Promise.all([
     safeLatest(),
@@ -347,7 +351,7 @@ export async function TodayStorySection() {
     safeExperiments(),
   ]);
   return (
-    <section className="today-story-grid" aria-label="Today summary and changes">
+    <section className="today-story-grid" aria-label={copy.sections.storyAria}>
       <div className="today-story-left">
         <WeeklyBriefCard latest={latest} narratorOff={isNarratorOff(privacy?.provider)} history={narratives ?? []} />
         <ExperimentsCard experiments={experiments} candidates={candidates} />
@@ -357,7 +361,7 @@ export async function TodayStorySection() {
   );
 }
 
-export async function SignalsSection() {
+export async function SignalsSection({ copy }: { copy: TodayCopy }) {
   if (!(await hasAnyData())) return null;
   const [{ defs: baseDefs, pinned }, goal] = await Promise.all([gridDefs(), getFocusGoal()]);
   let defs = baseDefs;
@@ -386,7 +390,7 @@ export async function SignalsSection() {
   };
   return (
     <>
-      <div className="section-label">Signals{pinned ? " - pinned" : ""}</div>
+      <div className="section-label">{pinned ? copy.sections.signalsPinned : copy.sections.signals}</div>
       <section className="grid today-signals-grid">
         {defs.map((metric) => (
           <MetricCard key={metric.id} series={map.get(metric.id) ?? null} fallbackTitle={metric.title} />

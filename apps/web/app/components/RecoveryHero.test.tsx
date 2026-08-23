@@ -1,11 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
+import { dictionaries } from "../lib/i18n";
 import { RecoveryHero } from "./RecoveryHero";
+
+const en = dictionaries.en.today.hero;
 
 describe("RecoveryHero", () => {
   test("shows the headline and dek split from the summary", () => {
     const html = renderToStaticMarkup(
       <RecoveryHero
+        copy={en}
         freshness="fresh"
         score={82}
         summary="Recovery is solid. Sleep was restorative and HRV is above baseline."
@@ -19,6 +23,7 @@ describe("RecoveryHero", () => {
   test("maps score 82 to the Prime state with the corresponding CSS hook", () => {
     const html = renderToStaticMarkup(
       <RecoveryHero
+        copy={en}
         freshness="fresh"
         score={82}
         summary="Recovery is solid. Sleep was restorative."
@@ -31,10 +36,10 @@ describe("RecoveryHero", () => {
 
   test("maps score 65 to Steady and score 50 to Caution", () => {
     const html65 = renderToStaticMarkup(
-      <RecoveryHero freshness="fresh" score={65} summary="Steady day. Nothing dramatic." ribbon={null} />,
+      <RecoveryHero copy={en} freshness="fresh" score={65} summary="Steady day. Nothing dramatic." ribbon={null} />,
     );
     const html50 = renderToStaticMarkup(
-      <RecoveryHero freshness="fresh" score={50} summary="Caution day. Watch your load." ribbon={null} />,
+      <RecoveryHero copy={en} freshness="fresh" score={50} summary="Caution day. Watch your load." ribbon={null} />,
     );
     expect(html65).toContain("Steady");
     expect(html50).toContain("Caution");
@@ -42,7 +47,7 @@ describe("RecoveryHero", () => {
 
   test("renders 'Building' chip and muted tone when score is null", () => {
     const html = renderToStaticMarkup(
-      <RecoveryHero freshness="fresh" score={null} summary="Building…" ribbon={null} />,
+      <RecoveryHero copy={en} freshness="fresh" score={null} summary="Building…" ribbon={null} />,
     );
     expect(html).toContain("Building");
     expect(html).toContain("dial-tone-muted");
@@ -50,10 +55,11 @@ describe("RecoveryHero", () => {
 
   test("shows evidence label only when provided", () => {
     const without = renderToStaticMarkup(
-      <RecoveryHero freshness="fresh" score={70} summary="Steady. Calm baseline." ribbon={null} />,
+      <RecoveryHero copy={en} freshness="fresh" score={70} summary="Steady. Calm baseline." ribbon={null} />,
     );
     const withEvidence = renderToStaticMarkup(
       <RecoveryHero
+        copy={en}
         freshness="fresh"
         score={70}
         summary="Steady. Calm baseline."
@@ -69,6 +75,7 @@ describe("RecoveryHero", () => {
   test("formats a negative delta with the en-dash character and abs()", () => {
     const html = renderToStaticMarkup(
       <RecoveryHero
+        copy={en}
         freshness="fresh"
         score={70}
         summary="Slightly down. Watch HRV."
@@ -78,5 +85,25 @@ describe("RecoveryHero", () => {
     );
     expect(html).toContain("−12% vs baseline");
     expect(html).not.toContain("-12%");
+  });
+
+  test("renders the instrument and baseline ribbon in Simplified Chinese", () => {
+    const html = renderToStaticMarkup(
+      <RecoveryHero
+        copy={dictionaries["zh-CN"].today.hero}
+        freshness="30 分钟前"
+        score={82}
+        summary="状态整体平稳。没有需要立即关注的明显变化。"
+        ribbon={{ values: [48, 52], axis: ["30 天前", "今天"] }}
+        deltaPct={7}
+      />,
+    );
+
+    expect(html).toContain("今日重点");
+    expect(html).toContain("恢复度");
+    expect(html).toContain("充沛");
+    expect(html).toContain("+7% 较个人基线");
+    expect(html).toContain("HRV 基线");
+    expect(html).toContain("最近读数：30 分钟前");
   });
 });
