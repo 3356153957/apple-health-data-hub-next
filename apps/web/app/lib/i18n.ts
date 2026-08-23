@@ -1,4 +1,4 @@
-export const LOCALES = ["en", "es", "fr", "de", "ja", "zh-TW"] as const;
+export const LOCALES = ["en", "es", "fr", "de", "ja", "zh-TW", "zh-CN"] as const;
 
 export type Locale = (typeof LOCALES)[number];
 
@@ -11,10 +11,11 @@ export const LOCALE_OPTIONS: readonly { value: Locale; label: string }[] = [
   { value: "de", label: "Deutsch" },
   { value: "ja", label: "日本語" },
   { value: "zh-TW", label: "繁體中文" },
+  { value: "zh-CN", label: "简体中文" },
 ];
 
 const DEFAULT_LOCALE: Locale = "en";
-const RELEASED_LOCALES: readonly Locale[] = [DEFAULT_LOCALE];
+const RELEASED_LOCALES: readonly Locale[] = [DEFAULT_LOCALE, "zh-CN"];
 
 export function parseLocale(raw: string | undefined | null): Locale {
   return LOCALES.includes(raw as Locale) ? (raw as Locale) : DEFAULT_LOCALE;
@@ -521,6 +522,85 @@ export const dictionaries = {
       pinnedSignals: "釘選訊號",
       noPinned:
         "尚未釘選任何項目；今日格線會顯示預設精選。在{library}替任一訊號加星號，就能建立自己的格線。",
+    },
+  },
+  "zh-CN": {
+    chrome: {
+      closeNavigation: "关闭导航",
+      openNavigation: "打开导航",
+      commandSearch: "跳转到指标或页面（Command K）",
+      search: "搜索",
+      serviceStatus: "服务状态",
+      language: "语言",
+      footer: "HealthSave Observatory · 规范化观测数据 · 本地优先",
+    },
+    density: { label: "视图模式", essentials: "精简", observatory: "观测站" },
+    navGroups: { essentials: "常用", explore: "分析", manage: "管理" },
+    nav: {
+      today: "今日",
+      sleep: "睡眠",
+      activity: "活动",
+      findings: "健康发现",
+      data: "数据",
+      sources: "数据源",
+      privacy: "隐私",
+      explore: "探索",
+      library: "指标库",
+      compare: "对比",
+      relationships: "相关性",
+      experiments: "健康实验",
+      timeline: "时间线",
+      integrations: "集成",
+      intelligence: "智能分析",
+      settings: "设置",
+    },
+    titles: {
+      today: "今日",
+      todaySub: "恢复状态、近期变化和值得关注的指标。",
+      sleep: "睡眠",
+      sleepSub: "睡眠阶段、时长、规律性和睡眠债，逐夜查看。",
+      activity: "活动",
+      activitySub: "每日负荷、步数、能量消耗和心血管负荷。",
+      demoSub: "使用本地演示数据展示 30 天健康变化。",
+      experiments: "健康实验",
+      experimentsSub: "尝试一种改变，再测量它是否有帮助。",
+      timeline: "健康时间线",
+      timelineSub: "一览你的健康历程：时刻、变化与决定。",
+      findings: "健康发现",
+      findingsSub: "优先呈现重要变化，需要时再深入计算细节。",
+      sources: "数据源",
+      sourcesSub: "查看每个数字的来源及新鲜度。",
+      data: "数据",
+      dataSub: "指标、覆盖率、就绪状态和导出。",
+      explore: "自定义分析",
+      exploreSub: "使用任意健康指标组合自己的面板。",
+      compare: "对比",
+      compareSub: "在保留数据来源的前提下比较周期、来源和设备。",
+      relationships: "相关性",
+      relationshipsSub: "探索多个健康指标如何共同变化。",
+      privacy: "隐私",
+      privacySub: "查看哪些数据留在本机、哪些离开了主机以及原因。",
+      library: "指标库",
+      librarySub: "搜索并固定你采集的每一项健康指标。",
+      intelligence: "智能分析",
+      intelligenceSub: "默认由本地模型解读，只有明确同意后才使用云端。",
+      integrations: "集成",
+      integrationsSub: "汇总输入来源和输出目标，并显示实时状态。",
+      settings: "设置",
+      settingsSub: "在一个页面管理偏好、服务和系统状态。",
+    },
+    settings: {
+      viewTitle: "视图",
+      viewHintEssentials: "精简",
+      viewHintObservatory: "观测站",
+      viewHint:
+        "仅保留日常页面导航；{observatory} 会展示全部高级视图。无论使用哪种模式，所有页面仍可通过网址访问。",
+      languageTitle: "语言",
+      languageHint:
+        "选择导航、页面标题和公共控件使用的界面语言。后续可以继续把页面正文迁移到同一翻译目录。",
+      pinnedSignals: "已固定指标",
+      noPinned:
+        "尚未固定任何指标——今日面板会显示默认推荐内容。请在 {library} 中收藏指标，构建自己的面板。",
     },
   },
 } satisfies Record<Locale, Dictionary>;

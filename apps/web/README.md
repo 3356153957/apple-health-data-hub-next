@@ -17,6 +17,12 @@ Point `API_BASE` at a running HealthSave Observatory API. Set `API_KEY` when the
 API requires one. Server components fetch directly; the `/api/*` rewrite in
 `next.config.mjs` covers client-side fetches.
 
+## Interface languages
+
+English and Simplified Chinese (`zh-CN`) are available in normal builds. Other
+incomplete translations remain behind `HEALTHSAVE_EXPERIMENTAL_LOCALES=1` until
+their shared catalogs are ready for release.
+
 ## Status
 
 The app is part of the default `docker compose` stack as service `web` on

@@ -23,13 +23,15 @@ describe("i18n", () => {
   test("parseLocale accepts only supported locales", () => {
     expect(parseLocale("fr")).toBe("fr");
     expect(parseLocale("zh-TW")).toBe("zh-TW");
+    expect(parseLocale("zh-CN")).toBe("zh-CN");
     expect(parseLocale("pt-BR")).toBe("en");
     expect(parseLocale(undefined)).toBe("en");
   });
 
-  test("unfinished locales stay behind an explicit preview gate", () => {
-    expect(availableLocales(false)).toEqual(["en"]);
+  test("only finished locales are released without the preview gate", () => {
+    expect(availableLocales(false)).toEqual(["en", "zh-CN"]);
     expect(availableLocales(true)).toEqual(LOCALES);
+    expect(resolveAvailableLocale("zh-CN", false)).toBe("zh-CN");
     expect(resolveAvailableLocale("fr", false)).toBe("en");
     expect(resolveAvailableLocale("fr", true)).toBe("fr");
     expect(resolveAvailableLocale("pt-BR", true)).toBe("en");
