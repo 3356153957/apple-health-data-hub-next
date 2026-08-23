@@ -283,4 +283,3 @@ git log --oneline upstream/main..HEAD
 git add docs/superpowers/plans/2026-08-23-zh-cn-baseline.md
 git commit -m "docs: add Simplified Chinese baseline plan"
 ```
-
