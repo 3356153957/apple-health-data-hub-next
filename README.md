@@ -1,3 +1,11 @@
+> [!NOTE]
+> **非官方衍生版 · Unofficial derived version**
+>
+> 本仓库基于 [umutkeltek/healthsave-observatory](https://github.com/umutkeltek/healthsave-observatory) 修改，主要增加简体中文（`zh-CN`）界面，切换方式见 [`apps/web/README.md`](apps/web/README.md#interface-languages)。它与 HealthSave 及其作者没有隶属关系，也不是官方发行版；下文介绍、截图、App Store 链接和 CI 徽章均来自上游项目。
+> 代码沿用上游许可（主体为 Elastic License 2.0，详见 [`LICENSING.md`](LICENSING.md)），名称与标识的使用遵循 [`TRADEMARK.md`](TRADEMARK.md)。
+>
+> This repository is a modified version of HealthSave Observatory that adds a Simplified Chinese interface. It is not affiliated with or endorsed by HealthSave or its author; the description, screenshots, App Store link and CI badge below refer to the upstream project. [![This repository's CI](https://github.com/3356153957/apple-health-data-hub-next/actions/workflows/ci.yml/badge.svg)](https://github.com/3356153957/apple-health-data-hub-next/actions/workflows/ci.yml)
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/github/hero-dark.png">
